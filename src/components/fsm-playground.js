@@ -11,6 +11,7 @@ class FsmPlayground extends LitElement {
     // UI form fields (light DOM reads)
     selectedFrom: { type: String },
     selectedTo: { type: String }
+    ,statusMessage: { type: String }
   }
 
 
@@ -26,6 +27,15 @@ class FsmPlayground extends LitElement {
     this.selectedTo = ''
     this.startState = ''
     this.blockScale = 0.7 // 70% size (30% smaller)
+    this.statusMessage = ''
+    this._statusTimer = null
+  }
+
+  showStatus (msg, timeout = 3000) {
+    this.statusMessage = msg
+    this.requestUpdate()
+    if (this._statusTimer) clearTimeout(this._statusTimer)
+    this._statusTimer = setTimeout(() => { this.statusMessage = ''; this.requestUpdate() }, timeout)
   }
 
   // render into light DOM so global styles and Blockly tooling apply
@@ -72,8 +82,19 @@ class FsmPlayground extends LitElement {
 
     this.workspace.addChangeListener(() => {
       try {
-        const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(this.workspace))
-        localStorage.setItem(this.autosaveKey, xml)
+        if (Blockly.serialization && Blockly.serialization.workspaces && Blockly.serialization.workspaces.save) {
+          try {
+            const stateObj = Blockly.serialization.workspaces.save(this.workspace)
+            localStorage.setItem(this.autosaveKey, JSON.stringify({ format: 'ser', v: 1, state: stateObj }))
+          } catch (se) {
+            // fall back to XML
+            const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(this.workspace))
+            localStorage.setItem(this.autosaveKey, xml)
+          }
+        } else {
+          const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(this.workspace))
+          localStorage.setItem(this.autosaveKey, xml)
+        }
       } catch (e) {}
       this._rebuildGraphFromBlocks()
     })
@@ -199,7 +220,7 @@ class FsmPlayground extends LitElement {
 
   // Programmatic helpers to mutate Blockly workspace
   addState () {
-    if (!this.workspace) { alert('Workspace not ready'); return }
+    if (!this.workspace) { this.showStatus('Workspace not ready'); return }
     const name = window.prompt('State name', `q${this.nodes.length}`)
     if (!name) return
     const blk = this.workspace.newBlock('fsm_state')
@@ -211,11 +232,11 @@ class FsmPlayground extends LitElement {
   }
 
   createTransitionFromUI () {
-    if (!this.workspace) { alert('Workspace not ready'); return }
+    if (!this.workspace) { this.showStatus('Workspace not ready'); return }
     const from = (this.querySelector('#fromSelect') && this.querySelector('#fromSelect').value) || ''
     const to = (this.querySelector('#toSelect') && this.querySelector('#toSelect').value) || ''
     const event = (this.querySelector('#symbolInput') && this.querySelector('#symbolInput').value) || ''
-    if (!from || !to || !event) { alert('Please select From, To and provide an event'); return }
+    if (!from || !to || !event) { this.showStatus('Please select From, To and provide an event'); return }
 
     // find the state block corresponding to `from`
     const blocks = this.workspace.getAllBlocks(false)
@@ -226,7 +247,7 @@ class FsmPlayground extends LitElement {
         if (name === from) { stateBlock = b; break }
       }
     }
-    if (!stateBlock) { alert('From state block not found'); return }
+    if (!stateBlock) { this.showStatus('From state block not found'); return }
 
     // create transition and connect into the TRANSITIONS statement input
     const t = this.workspace.newBlock('fsm_transition')
@@ -236,7 +257,7 @@ class FsmPlayground extends LitElement {
 
     const inputConn = stateBlock.getInput('TRANSITIONS') && stateBlock.getInput('TRANSITIONS').connection
     if (!inputConn) {
-      alert('State block has no TRANSITIONS input');
+      this.showStatus('State block has no TRANSITIONS input')
       return
     }
     const first = inputConn.targetBlock()
@@ -284,48 +305,72 @@ class FsmPlayground extends LitElement {
   saveToLocal () {
     if (!this.workspace) return
     try {
-      const xml = Blockly.Xml.workspaceToDom(this.workspace)
-      const txt = Blockly.Xml.domToText(xml)
-      localStorage.setItem(this.autosaveKey, txt)
-      alert('Workspace saved to localStorage')
-    } catch (e) { console.error(e); alert('Save failed') }
+      // Prefer Blockly serialization API when available
+      if (Blockly.serialization && Blockly.serialization.workspaces && Blockly.serialization.workspaces.save) {
+        const stateObj = Blockly.serialization.workspaces.save(this.workspace)
+        localStorage.setItem(this.autosaveKey, JSON.stringify({ format: 'ser', v: 1, state: stateObj }))
+      } else {
+        const xml = Blockly.Xml.workspaceToDom(this.workspace)
+        const txt = Blockly.Xml.domToText(xml)
+        localStorage.setItem(this.autosaveKey, txt)
+      }
+      this.showStatus('Workspace saved')
+    } catch (e) { console.error(e); this.showStatus('Save failed') }
   }
 
   loadFromLocal () {
     if (!this.workspace) return
     const saved = localStorage.getItem(this.autosaveKey)
-    if (!saved) { alert('No saved workspace in localStorage'); return }
+    if (!saved) { this.showStatus('No saved workspace in localStorage'); return }
     try {
-      let xml
-      try {
-        xml = Blockly.Xml.textToDom(saved)
-      } catch (inner) {
-        console.warn('Blockly.Xml.textToDom failed, trying DOMParser', inner)
-        const parser = new DOMParser()
-        const doc = parser.parseFromString(saved, 'application/xml')
-        if (doc && doc.documentElement) xml = doc.documentElement
-        else throw inner
+      // detect our serialized envelope
+      let parsed = null
+      try { parsed = JSON.parse(saved) } catch (e) { parsed = null }
+      if (parsed && parsed.format === 'ser' && parsed.state) {
+        if (Blockly.serialization && Blockly.serialization.workspaces && Blockly.serialization.workspaces.load) {
+          Blockly.serialization.workspaces.load(parsed.state, this.workspace)
+        } else {
+          console.warn('Serialization load requested but Blockly.serialization not available; attempting XML fallback')
+          // Try to convert via XML fallback if possible
+          try {
+            const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(this.workspace))
+            const dom = Blockly.Xml.textToDom(xml)
+            Blockly.Xml.clearWorkspaceAndLoadFromXml(dom, this.workspace)
+          } catch (e) { console.warn('XML fallback failed', e) }
+        }
+      } else {
+        // treat as XML string
+        let xml
+        try {
+          xml = Blockly.Xml.textToDom(saved)
+        } catch (inner) {
+          console.warn('Blockly.Xml.textToDom failed, trying DOMParser', inner)
+          const parser = new DOMParser()
+          const doc = parser.parseFromString(saved, 'application/xml')
+          if (doc && doc.documentElement) xml = doc.documentElement
+          else throw inner
+        }
+        Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, this.workspace)
       }
-      Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, this.workspace)
       this._rebuildGraphFromBlocks()
       this._shiftTopBlocksIfUnderToolbox()
-      alert('Workspace loaded')
-    } catch (e) { console.error('Load failed', e); alert('Load failed: ' + (e && e.message ? e.message : e)) }
+      this.showStatus('Workspace loaded')
+    } catch (e) { console.error('Load failed', e); this.showStatus('Load failed: ' + (e && e.message ? e.message : e)) }
   }
 
   setStartState () {
     const from = (this.querySelector('#fromSelect') && this.querySelector('#fromSelect').value) || ''
-    if (!from) { alert('Select a state to set as start'); return }
+    if (!from) { this.showStatus('Select a state to set as start'); return }
     this.startState = from
     this.requestUpdate()
   }
 
   start () {
-    if (!this.startState) { alert('No start state defined'); return }
+    if (!this.startState) { this.showStatus('No start state defined'); return }
     this.current = this.startState
     this.requestUpdate()
     // simple visual feedback
-    alert(`FSM started at ${this.startState}`)
+    this.showStatus(`FSM started at ${this.startState}`)
   }
 
   exportWorkspace () {
@@ -356,8 +401,8 @@ class FsmPlayground extends LitElement {
         Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, this.workspace)
         this._rebuildGraphFromBlocks()
         this._shiftTopBlocksIfUnderToolbox()
-        alert('Workspace imported')
-      } catch (e) { console.error('Import failed', e); alert('Import failed: ' + (e && e.message ? e.message : e)) }
+          this.showStatus('Workspace imported')
+      } catch (e) { console.error('Import failed', e); this.showStatus('Import failed: ' + (e && e.message ? e.message : e)) }
     }
     r.readAsText(file)
   }
@@ -420,7 +465,8 @@ class FsmPlayground extends LitElement {
             </ul>
           </div>
         </div>
-      </div>
+                <div class="statusbar">${this.statusMessage ? html`<div class="msg">${this.statusMessage}</div>` : ''}</div>
+              </div>
     `
   }
 }
