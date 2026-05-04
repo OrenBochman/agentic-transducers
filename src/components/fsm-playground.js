@@ -70,15 +70,8 @@ class FsmPlayground extends LitElement {
       return
     }
 
-    // load autosave
-    const saved = localStorage.getItem(this.autosaveKey)
-    if (saved) {
-      try {
-        const xml = Blockly.Xml.textToDom(saved)
-        Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, this.workspace)
-        try { this.workspace.setScale(this.blockScale) } catch (e) { console.warn('setScale after load failed', e) }
-      } catch (e) { console.warn(e) }
-    }
+    // load autosave (use serialization-aware loader)
+    try { this.loadFromLocal() } catch (e) { console.warn('loadFromLocal failed during init', e) }
 
     this.workspace.addChangeListener(() => {
       try {
@@ -363,6 +356,8 @@ class FsmPlayground extends LitElement {
         }
         Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, this.workspace)
       }
+      // re-apply workspace scale (if available) after load
+      try { if (this.workspace && this.workspace.setScale) this.workspace.setScale(this.blockScale) } catch (sErr) { console.warn('setScale after load failed', sErr) }
       this._rebuildGraphFromBlocks()
       this._shiftTopBlocksIfUnderToolbox()
       this.showStatus('Workspace loaded')
