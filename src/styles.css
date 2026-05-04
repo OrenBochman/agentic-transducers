@@ -3,3 +3,9 @@ html,body{height:100%}
 body{margin:0;background:var(--bg);color:#0f172a}
 header{padding:16px 24px}
 main{max-width:1000px;margin:0 auto;padding:16px}
+
+/* Palette & canvas tweaks */
+.workspace { display: grid; grid-template-columns: 220px 1fr; gap: 12px }
+.panel { background:#fff;border-radius:8px;padding:12px;border:1px solid #e6e6e6 }
+.palette .block { user-select:none }
+

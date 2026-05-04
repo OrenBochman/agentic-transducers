@@ -9,10 +9,12 @@ But this time to teach stem concepts in a more interactive way.
 
 ## Tasks
 
-1. create a lit js + vite based pwa using a web component called <fsm-playground> which supports building fsm and transducers.
+1. [x] create a lit js + vite based pwa using a web component called <fsm-playground> which supports building fsm and transducers.
 then we can add lessons for regex, automata, tansducers, generation, parsing
-2. add logging and error handling to the component
-3. document project using mermaid and 
+2. [x] This should be based on blockly elements and similar to Scratch playground but for FSMs and transducers. 
+3. [ ] This means we want to cover what we should aim to cover material on the level of https://www.youtube.com/watch?v=hNhI6-qM454 .
+2. [x] add logging and error handling to the component
+3. [x] document project using mermaid  
 
 
 ## Code Style

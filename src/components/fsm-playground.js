@@ -2,81 +2,125 @@ import { LitElement, html, css } from 'lit'
 
 class FsmPlayground extends LitElement {
   static properties = {
-    states: { type: Array },
-    transitions: { type: Array },
+    nodes: { type: Array },
+    edges: { type: Array },
     current: { type: String },
     input: { type: String },
     output: { type: String },
-    transducerMode: { type: Boolean }
+    transducerMode: { type: Boolean },
+    creatingEdgeFrom: { type: String }
   }
 
   static styles = css`
     :host { display: block; font-family: system-ui, Arial, sans-serif; padding: 16px; }
-    .panel { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
-    section { border: 1px solid #ddd; padding: 12px; border-radius: 8px; background: #fff }
-    label { display:block; font-size: 13px; margin-bottom:6px }
-    input, select { width:100%; padding:6px; margin-bottom:8px }
-    button { padding:6px 10px }
-    pre { background:#f6f8fa; padding:8px; border-radius:6px; overflow:auto }
+    .workspace { display: grid; grid-template-columns: 220px 1fr; gap: 12px; }
+    .panel { border: 1px solid #ddd; padding: 12px; border-radius: 8px; background: #fff }
+    .palette { display:flex;flex-direction:column;gap:8px }
+    .block { background:#0f172a;color:#fff;padding:8px;border-radius:6px;cursor:grab }
+    .canvas { background:#fff;border-radius:8px;min-height:480px;border:1px solid #e6e6e6 }
+    svg{width:100%;height:480px;display:block}
+    .controls{display:flex;gap:8px;align-items:center;margin-top:8px}
   `
 
   constructor () {
     super()
-    this.states = []
-    this.transitions = []
+    this.nodes = []
+    this.edges = []
     this.current = ''
     this.input = ''
     this.output = ''
-    this.transducerMode = false
+    this.transducerMode = true
+    this.creatingEdgeFrom = null
+    this._nodeId = 1
   }
 
-  addState (e) {
+  // Palette dragstart
+  onPaletteDragStart (e) {
+    e.dataTransfer.setData('text/fsm', 'create-node')
+  }
+
+  // Canvas dragover/drop to create node
+  onCanvasDragOver (e) { e.preventDefault() }
+  onCanvasDrop (e) {
     e.preventDefault()
-    const name = this.shadowRoot.getElementById('stateName').value.trim()
-    if (!name) return
-    if (!this.states.includes(name)) this.states = [...this.states, name]
+    const type = e.dataTransfer.getData('text/fsm')
+    if (type !== 'create-node') return
+    const rect = this.shadowRoot.getElementById('svgArea').getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const id = `n${this._nodeId++}`
+    const name = `q${this.nodes.length}`
+    this.nodes = [...this.nodes, { id, name, x, y }]
     if (!this.current) this.current = name
     this.requestUpdate()
   }
 
-  addTransition (e) {
-    e.preventDefault()
-    const from = this.shadowRoot.getElementById('fromState').value
-    const to = this.shadowRoot.getElementById('toState').value
-    const symbol = this.shadowRoot.getElementById('symbol').value
-    const out = this.shadowRoot.getElementById('output').value
-    if (!from || !to || symbol === '') return
-    const t = { from, to, symbol, output: out }
-    this.transitions = [...this.transitions, t]
+  // Node pointer drag
+  startNodeDrag (ev, node) {
+    ev.preventDefault()
+    const svg = this.shadowRoot.getElementById('svgArea')
+    const onMove = (e) => {
+      const rect = svg.getBoundingClientRect()
+      node.x = e.clientX - rect.left
+      node.y = e.clientY - rect.top
+      this.requestUpdate()
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  clickNode (ev, node) {
+    ev.stopPropagation()
+    if (!this.creatingEdgeFrom) {
+      this.creatingEdgeFrom = node.id
+      this.requestUpdate()
+      return
+    }
+    if (this.creatingEdgeFrom === node.id) {
+      this.creatingEdgeFrom = null
+      this.requestUpdate()
+      return
+    }
+    const symbol = prompt('Enter transition symbol (single char)') || ''
+    if (symbol === '') { this.creatingEdgeFrom = null; return }
+    const output = this.transducerMode ? (prompt('Output for transducer (optional)') || '') : ''
+    this.edges = [...this.edges, { from: this.creatingEdgeFrom, to: node.id, symbol, output }]
+    this.creatingEdgeFrom = null
     this.requestUpdate()
   }
 
-  setCurrent (e) {
-    this.current = e.target.value
-  }
+  // Render helpers
+  nodeById (id) { return this.nodes.find(n => n.id === id) }
 
   simulate (e) {
     e && e.preventDefault()
     const input = this.shadowRoot.getElementById('inputStr').value || ''
-    let state = this.current
+    let stateName = this.current
     let out = ''
     for (const ch of input) {
-      const t = this.transitions.find(t => t.from === state && t.symbol === ch)
-      if (!t) { state = null; break }
-      state = t.to
-      if (t.output) out += t.output
+      const fromNode = this.nodes.find(n => n.name === stateName)
+      if (!fromNode) { stateName = null; break }
+      const edge = this.edges.find(ed => ed.from === fromNode.id && ed.symbol === ch)
+      if (!edge) { stateName = null; break }
+      const toNode = this.nodeById(edge.to)
+      stateName = toNode ? toNode.name : null
+      if (edge.output) out += edge.output
     }
     this.output = out
     this.requestUpdate()
   }
 
   exportJSON () {
-    const data = { states: this.states, transitions: this.transitions, start: this.current }
+    const data = { nodes: this.nodes, edges: this.edges, start: this.current }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'fsm.json'
+    a.download = 'fsm-graph.json'
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -88,79 +132,78 @@ class FsmPlayground extends LitElement {
     reader.onload = () => {
       try {
         const obj = JSON.parse(reader.result)
-        this.states = obj.states || []
-        this.transitions = obj.transitions || []
-        this.current = obj.start || (this.states[0] || '')
+        this.nodes = obj.nodes || []
+        this.edges = obj.edges || []
+        this.current = obj.start || (this.nodes[0] && this.nodes[0].name) || ''
         this.requestUpdate()
       } catch (err) {
-        console.error(err)
+        console.error('Invalid JSON', err)
       }
     }
     reader.readAsText(file)
   }
 
-  toggleTransducer (e) {
-    this.transducerMode = e.target.checked
-  }
+  setCurrentByName (e) { this.current = e.target.value }
 
   render () {
     return html`
-      <div class="panel">
-        <section>
-          <h3>States</h3>
-          <form @submit=${this.addState}>
-            <label for="stateName">New state name</label>
-            <input id="stateName" placeholder="q0" />
-            <button type="submit">Add state</button>
-          </form>
+      <div class="workspace">
+        <aside class="panel">
+          <h3>Palette</h3>
+          <div class="palette">
+            <div class="block" draggable="true" @dragstart=${this.onPaletteDragStart}>State</div>
+          </div>
 
-          <label>Start / Current state</label>
-          <select @change=${this.setCurrent} .value=${this.current}>
-            ${this.states.map(s => html`<option value=${s}>${s}</option>`) }
+          <h4 style="margin-top:12px">Controls</h4>
+          <div class="controls">
+            <button @click=${this.exportJSON}>Export</button>
+            <input type="file" accept="application/json" @change=${this.importJSON} />
+          </div>
+
+          <h4 style="margin-top:12px">Start / Current</h4>
+          <select @change=${this.setCurrentByName} .value=${this.current}>
+            ${this.nodes.map(n => html`<option value=${n.name}>${n.name}</option>`) }
           </select>
 
-          <h4>Export / Import</h4>
-          <button @click=${this.exportJSON}>Export FSM</button>
-          <input type="file" accept="application/json" @change=${this.importJSON} />
-        </section>
-
-        <section>
-          <h3>Transitions</h3>
-          <form @submit=${this.addTransition}>
-            <label>From</label>
-            <select id="fromState">
-              ${this.states.map(s => html`<option value=${s}>${s}</option>`)}
-            </select>
-            <label>To</label>
-            <select id="toState">
-              ${this.states.map(s => html`<option value=${s}>${s}</option>`)}
-            </select>
-            <label>Symbol (single char)</label>
-            <input id="symbol" maxlength="4" placeholder="a" />
-            <label>Output (optional, for transducers)</label>
-            <input id="output" placeholder="x" />
-            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-              <input id="tdMode" type="checkbox" @change=${this.toggleTransducer} ?checked=${this.transducerMode} />
-              <label for="tdMode">Transducer mode (enable outputs)</label>
-            </div>
-            <button type="submit">Add transition</button>
-          </form>
-
-          <h4>Current Transitions</h4>
-          <pre>${JSON.stringify(this.transitions, null, 2)}</pre>
-        </section>
-
-        <section style="grid-column: 1 / -1">
-          <h3>Run / Simulate</h3>
-          <form @submit=${this.simulate}>
-            <label>Input string</label>
-            <input id="inputStr" placeholder="abba" />
-            <button type="submit">Simulate</button>
-          </form>
           <div style="margin-top:12px">
-            <strong>Output:</strong>
-            <pre>${this.output}</pre>
-            <strong>Start state:</strong> ${this.current}
+            <label><input type="checkbox" @change=${(e) => this.transducerMode = e.target.checked} ?checked=${this.transducerMode} /> Transducer mode</label>
+          </div>
+        </aside>
+
+        <section class="canvas panel" @dragover=${this.onCanvasDragOver} @drop=${this.onCanvasDrop} @click=${() => { this.creatingEdgeFrom = null }}>
+          <svg id="svgArea">
+            ${this.edges.map(ed => {
+              const a = this.nodeById(ed.from)
+              const b = this.nodeById(ed.to)
+              if (!a || !b) return null
+              return html`<g>
+                <line x1=${a.x} y1=${a.y} x2=${b.x} y2=${b.y} stroke="#666" stroke-width="2" marker-end="url(#arrow)" />
+                <text x=${(a.x + b.x)/2} y=${(a.y + b.y)/2 - 6} font-size="12" fill="#111" text-anchor="middle">${ed.symbol}${ed.output ? ' / ' + ed.output : ''}</text>
+              </g>`
+            })}
+
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L9,3 z" fill="#666" />
+              </marker>
+            </defs>
+
+            ${this.nodes.map(node => {
+              const fill = this.creatingEdgeFrom === node.id ? '#ffecb3' : (node.name === this.current ? '#0f172a' : '#88a')
+              return html`<g @pointerdown=${(e) => this.startNodeDrag(e, node)} @click=${(e) => this.clickNode(e, node)} style="cursor:move">
+                <circle cx=${node.x} cy=${node.y} r="28" fill=${fill} />
+                <text x=${node.x} y=${node.y + 4} font-size="12" fill="#fff" text-anchor="middle">${node.name}</text>
+              </g>`
+            })}
+          </svg>
+
+          <div style="padding:12px">
+            <form @submit=${this.simulate}>
+              <label>Input</label>
+              <input id="inputStr" placeholder="abba" />
+              <button type="submit">Run</button>
+            </form>
+            <div style="margin-top:8px"><strong>Output:</strong> <pre>${this.output}</pre></div>
           </div>
         </section>
       </div>
