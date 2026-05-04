@@ -11,10 +11,25 @@ use materials from https://developers.google.com/blockly/guides/get-started to g
 
 ## Tasks
 
-1. [x] create a lit js + vite based pwa using a web component called <fsm-playground> which supports building fsm and transducers.
+1. [ ] create a lit js + vite based pwa using a web component called <fsm-playground> which supports building fsm and transducers.
 then we can add lessons for regex, automata, tansducers, generation, parsing
 2. [ ] add blockly and be like a Scratch playground but for FSMs and transducers.
 3. [ ] create a workspace
+        - add need Injection div
+        - add injection code
+```html
+<div id="blocklyDiv" style="height: 480px; width: 600px;"></div>
+```
+        
+```js
+// Passes the ID.
+const workspace = Blockly.inject('blocklyDiv', { /* config */ });
+
+// Passes the injection div.
+const workspace = Blockly.inject(
+    document.getElementById('blocklyDiv'), { /* config */ });
+```        
+
 4. [ ] add a toolbox
 5. [ ] define custom blocks for states, transitions, 
 6. [ ] implement save and load

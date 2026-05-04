@@ -1,19 +1,25 @@
 :root{--bg:#f3f4f6}
 html,body{height:100%}
-body{margin:0;background:var(--bg);color:#0f172a}
-header{padding:16px 24px}
-main{max-width:1000px;margin:0 auto;padding:16px}
+body{margin:0;background:var(--bg);color:#0f172a;font-family:Inter,system-ui,Arial}
+header{padding:16px 24px;background:#0f172a;color:#fff}
+header h1{margin:0;font-size:18px}
+main{height:100vh;display:flex;flex-direction:column}
+.app{max-width:1400px;margin:12px auto;padding:12px;display:grid;grid-template-columns:1fr 360px;gap:12px}
+.panel{background:#fff;border-radius:8px;padding:12px;border:1px solid #e6e6e6}
+.topbar{position:fixed;right:20px;top:12px;z-index:999}
+.topbar button{margin-left:8px}
+.palette .block{user-select:none;padding:8px;border-radius:6px;background:#0f172a;color:#fff;cursor:pointer;text-align:center}
 
-/* Palette & canvas tweaks */
-.workspace { display: grid; grid-template-columns: 220px 1fr; gap: 12px }
-.panel { background:#fff;border-radius:8px;padding:12px;border:1px solid #e6e6e6 }
-.palette .block { user-select:none }
-/* Make Blockly main workspace more prominent */
-#blocklyMain { height: 560px; background: #f8fafc; border: 1px solid #e6e6e6; border-radius:6px }
-/* Tweak block appearance to be larger and more Scratch-like */
-#blocklyMain .blocklySvg { background: linear-gradient(180deg,#fff,#f7fbff) }
-#blocklyMain .blocklyBlockBackground { filter: drop-shadow(0 2px 0 rgba(0,0,0,0.06)); }
-#blocklyMain .blocklyText { font-size: 14px !important; font-weight: 600 }
-#blocklyMain .blocklyCommentText { font-size: 13px }
-#blocklyMain .blocklyFlyout { background: #f6f8fb }
+/* small non-blocking status bar */
+.statusbar{position:fixed;left:0;right:0;bottom:8px;margin:0 auto;width:100%;display:flex;justify-content:center;pointer-events:none}
+.statusbar .msg{background:rgba(17,24,39,0.95);color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;box-shadow:0 6px 18px rgba(2,6,23,0.2);pointer-events:auto}
 
+#blocklyMain{height:80vh;width:100%;border-radius:8px;overflow:hidden}
+#blocklyMain .blocklySvg{background:linear-gradient(180deg,#fff,#f7fbff)}
+#blocklyMain .blocklyText{font-size:14px;font-weight:600}
+
+.graph{padding:8px}
+.graph h4{margin:8px 0}
+.list{max-height:520px;overflow:auto}
+
+.controls button{margin-right:8px}

@@ -1,6 +1,6 @@
-# FSM & Transducer Playground
+# FSM & Transducer Playground (fresh)
 
-Lightweight Vite + Lit PWA to build and experiment with finite-state machines and transducers.
+This scaffold provides a Blockly-centered FSM playground built with Vite + Lit.
 
 Quick start
 
@@ -9,13 +9,10 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 and try the `fsm-playground` component.
-
-What this includes
-- `src/components/fsm-playground.js` — Lit web component for building FSMs and basic transducers
-- `manifest.webmanifest` + `service-worker.js` — basic PWA support
+Open http://localhost:5173 and try the `fsm-playground` component. The UI is Blockly-first with a toolbox containing FSM and Regex blocks, workspace autosave, export/import, and a simple graph view.
 
 Next steps
-- Add lessons for regex, automata, transducers, generation, parsing
-- Improve persistence and visual graph view
+- Polish Scratch-like visuals and onboarding
+- Add animated visual graph synced to blocks
+- Add lessons and example workspaces
 # agentic-transducers
