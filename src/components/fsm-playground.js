@@ -43,6 +43,8 @@ class FsmPlayground extends LitElement {
     try {
       const div = this.shadowRoot.getElementById('blocklyDiv')
       if (div) {
+        // define a Scratch-like theme and renderer
+        const scratchTheme = this._defineScratchTheme()
         const toolbox = `
           <xml xmlns="https://developers.google.com/blockly/xml">
             <category name="FSM" colour="#5C81A6">
@@ -104,7 +106,9 @@ class FsmPlayground extends LitElement {
           toolbox,
           scrollbars: true,
           zoom: { controls: true, wheel: true, startScale: 1 },
-          grid: { spacing: 20, length: 3, colour: '#ccc', snap: true }
+          grid: { spacing: 20, length: 3, colour: '#ccc', snap: true },
+          renderer: 'zelos',
+          theme: scratchTheme
         })
 
         // Rebuild graph from blocks whenever workspace changes
@@ -236,6 +240,46 @@ class FsmPlayground extends LitElement {
         const code = `var __re = new RegExp(${re}); alert(__re.test(${inp}));\n`
         return code
       }
+    }
+  }
+
+  _defineScratchTheme () {
+    try {
+      const theme = Blockly.Theme.defineTheme('scratch_like', {
+        base: Blockly.Themes.Classic,
+        blockStyles: {
+          'default': {
+            'colourPrimary': '#ffb74d',
+            'colourSecondary': '#f39c12',
+            'colourTertiary': '#ffd8a6'
+          },
+          'fsm_blocks': {
+            'colourPrimary': '#5C81A6',
+            'colourSecondary': '#4a6f86',
+            'colourTertiary': '#3b5966'
+          },
+          'regex_blocks': {
+            'colourPrimary': '#A65C9E',
+            'colourSecondary': '#8a4d87',
+            'colourTertiary': '#7a3d77'
+          }
+        },
+        categoryStyles: {
+          'fsm_category': { colour: '#5C81A6', textColour: '#fff' },
+          'regex_category': { colour: '#A65C9E', textColour: '#fff' }
+        },
+        componentStyles: {
+          'toolboxBackgroundColour': '#f3f6fb',
+          'toolboxForegroundColour': '#111',
+          'flyoutBackgroundColour': '#fefefe',
+          'flyoutForegroundColour': '#111',
+          'scrollbarColour': '#c1c7d0'
+        }
+      })
+      return theme
+    } catch (e) {
+      console.warn('Theme define failed', e)
+      return Blockly.Themes.Classic
     }
   }
 

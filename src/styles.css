@@ -10,5 +10,10 @@ main{max-width:1000px;margin:0 auto;padding:16px}
 .palette .block { user-select:none }
 /* Make Blockly main workspace more prominent */
 #blocklyMain { height: 560px; background: #f8fafc; border: 1px solid #e6e6e6; border-radius:6px }
+/* Tweak block appearance to be larger and more Scratch-like */
 #blocklyMain .blocklySvg { background: linear-gradient(180deg,#fff,#f7fbff) }
+#blocklyMain .blocklyBlockBackground { filter: drop-shadow(0 2px 0 rgba(0,0,0,0.06)); }
+#blocklyMain .blocklyText { font-size: 14px !important; font-weight: 600 }
+#blocklyMain .blocklyCommentText { font-size: 13px }
+#blocklyMain .blocklyFlyout { background: #f6f8fb }
 

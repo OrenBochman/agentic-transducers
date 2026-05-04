@@ -7,14 +7,18 @@ This educational resource will form the basis of a series of lessons on regular 
 This will be incorporated into a larger project to create a modern clone of the popular Primer web-app.
 But this time to teach stem concepts in a more interactive way.
 
+use materials from https://developers.google.com/blockly/guides/get-started to get stated with Blockly.
+
 ## Tasks
 
 1. [x] create a lit js + vite based pwa using a web component called <fsm-playground> which supports building fsm and transducers.
 then we can add lessons for regex, automata, tansducers, generation, parsing
-2. [x] This should be based on blockly elements and similar to Scratch playground but for FSMs and transducers. 
-3. [ ] This means we want to cover what we should aim to cover material on the level of https://www.youtube.com/watch?v=hNhI6-qM454 .
-2. [x] add logging and error handling to the component
-3. [x] document project using mermaid  
+2. [ ] add blockly and be like a Scratch playground but for FSMs and transducers.
+3. [ ] create a workspace
+4. [ ] add a toolbox
+5. [ ] define custom blocks for states, transitions, 
+6. [ ] implement save and load
+
 
 ## Code Style
 
