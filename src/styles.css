@@ -8,4 +8,7 @@ main{max-width:1000px;margin:0 auto;padding:16px}
 .workspace { display: grid; grid-template-columns: 220px 1fr; gap: 12px }
 .panel { background:#fff;border-radius:8px;padding:12px;border:1px solid #e6e6e6 }
 .palette .block { user-select:none }
+/* Make Blockly main workspace more prominent */
+#blocklyMain { height: 560px; background: #f8fafc; border: 1px solid #e6e6e6; border-radius:6px }
+#blocklyMain .blocklySvg { background: linear-gradient(180deg,#fff,#f7fbff) }
 

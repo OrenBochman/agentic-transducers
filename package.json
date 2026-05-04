@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "blockly": "^12.5.1",
     "lit": "^2.7.0"
   },
   "devDependencies": {

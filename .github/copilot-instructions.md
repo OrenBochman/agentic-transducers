@@ -16,7 +16,6 @@ then we can add lessons for regex, automata, tansducers, generation, parsing
 2. [x] add logging and error handling to the component
 3. [x] document project using mermaid  
 
-
 ## Code Style
 
 - Use semantic HTML5 elements (header, main, section, article, etc.)
