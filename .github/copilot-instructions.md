@@ -31,8 +31,20 @@ const workspace = Blockly.inject(
 ```        
 
 4. [ ] add a toolbox
-5. [ ] define custom blocks for states, transitions, 
-6. [ ] implement save and load
+5. [ ] define custom blocks for 
+    - state - with transition slot for nested events with goto another state, - these should wire up to the state with that name.
+    - start-state has no slot just next state field,
+    - end-state, 
+    - transitions with "on event" and "goto" fields, input field for automaton
+    - transitions with "on event" and "goto" fields, input +  output field for transducer
+    - transitions with "on event" and "goto" fields, emit field for automata
+    - transition-p adds also has a probability field for non-deterministic FSMs
+        - the last field always get the probability = 1 minus the sum of the other probabilities for that state.
+6. web site utilities with 
+    - play and stop button.
+    - export import buttons for workspace xml
+    - after an edit we should persist to local storage
+    - on load or after refresh we should load from local storage . 
 
 
 ## Code Style

@@ -308,7 +308,16 @@ class FsmPlayground extends LitElement {
       // Prefer Blockly serialization API when available
       if (Blockly.serialization && Blockly.serialization.workspaces && Blockly.serialization.workspaces.save) {
         const stateObj = Blockly.serialization.workspaces.save(this.workspace)
-        localStorage.setItem(this.autosaveKey, JSON.stringify({ format: 'ser', v: 1, state: stateObj }))
+        try {
+          const envelope = { format: 'ser', v: 1, state: stateObj }
+          const txt = JSON.stringify(envelope)
+          localStorage.setItem(this.autosaveKey, txt)
+        } catch (jsErr) {
+          console.error('JSON.stringify failed for serialized state', jsErr)
+          // fallback to XML
+          const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(this.workspace))
+          localStorage.setItem(this.autosaveKey, xml)
+        }
       } else {
         const xml = Blockly.Xml.workspaceToDom(this.workspace)
         const txt = Blockly.Xml.domToText(xml)
@@ -328,15 +337,17 @@ class FsmPlayground extends LitElement {
       try { parsed = JSON.parse(saved) } catch (e) { parsed = null }
       if (parsed && parsed.format === 'ser' && parsed.state) {
         if (Blockly.serialization && Blockly.serialization.workspaces && Blockly.serialization.workspaces.load) {
-          Blockly.serialization.workspaces.load(parsed.state, this.workspace)
-        } else {
-          console.warn('Serialization load requested but Blockly.serialization not available; attempting XML fallback')
-          // Try to convert via XML fallback if possible
           try {
-            const xml = Blockly.Xml.domToText(Blockly.Xml.workspaceToDom(this.workspace))
-            const dom = Blockly.Xml.textToDom(xml)
-            Blockly.Xml.clearWorkspaceAndLoadFromXml(dom, this.workspace)
-          } catch (e) { console.warn('XML fallback failed', e) }
+            Blockly.serialization.workspaces.load(parsed.state, this.workspace)
+          } catch (loadErr) {
+            console.error('serialization.workspaces.load failed', loadErr)
+            this.showStatus('Serialized load failed; attempting XML fallback')
+            // try XML fallback below
+            throw loadErr
+          }
+        } else {
+          console.warn('Serialization load requested but Blockly.serialization not available')
+          this.showStatus('Cannot load serialized state: serialization API missing')
         }
       } else {
         // treat as XML string
@@ -356,6 +367,35 @@ class FsmPlayground extends LitElement {
       this._shiftTopBlocksIfUnderToolbox()
       this.showStatus('Workspace loaded')
     } catch (e) { console.error('Load failed', e); this.showStatus('Load failed: ' + (e && e.message ? e.message : e)) }
+  }
+
+  inspectSaved () {
+    try {
+      const raw = localStorage.getItem(this.autosaveKey)
+      if (!raw) { this.showStatus('No saved workspace found'); console.info('No saved workspace'); return }
+      // try to detect format
+      let parsed = null
+      try { parsed = JSON.parse(raw) } catch (e) { parsed = null }
+      if (parsed && parsed.format === 'ser') {
+        const size = raw.length
+        this.showStatus(`Saved: serialized (${size} bytes)`, 6000)
+        console.info('Saved serialized workspace:', parsed)
+      } else if (parsed) {
+        this.showStatus(`Saved: JSON (unknown envelope, ${raw.length} bytes)`, 6000)
+        console.info('Saved JSON workspace:', parsed)
+      } else {
+        // likely XML
+        this.showStatus(`Saved: XML (${raw.length} bytes)`, 6000)
+        console.info('Saved XML (first 500 chars):', raw.slice(0, 500))
+      }
+    } catch (e) { console.error('inspectSaved failed', e); this.showStatus('Inspect failed') }
+  }
+
+  clearSaved () {
+    try {
+      localStorage.removeItem(this.autosaveKey)
+      this.showStatus('Cleared saved workspace')
+    } catch (e) { console.error('clearSaved failed', e); this.showStatus('Clear failed') }
   }
 
   setStartState () {
@@ -388,20 +428,42 @@ class FsmPlayground extends LitElement {
     const r = new FileReader()
     r.onload = () => {
       try {
-        let xml
-        try {
-          xml = Blockly.Xml.textToDom(r.result)
-        } catch (inner) {
-          console.warn('Blockly.Xml.textToDom failed for import, trying DOMParser', inner)
-          const parser = new DOMParser()
-          const doc = parser.parseFromString(r.result, 'application/xml')
-          if (doc && doc.documentElement) xml = doc.documentElement
-          else throw inner
+        const raw = (r.result || '').toString().trim()
+        // If it looks like XML, parse as XML
+        if (raw.startsWith('<')) {
+          let xml
+          try { xml = Blockly.Xml.textToDom(raw) } catch (inner) {
+            console.warn('Blockly.Xml.textToDom failed for import, trying DOMParser', inner)
+            const parser = new DOMParser()
+            const doc = parser.parseFromString(raw, 'application/xml')
+            if (doc && doc.documentElement) xml = doc.documentElement
+            else throw inner
+          }
+          Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, this.workspace)
+        } else {
+          // try JSON serialized format
+          let parsed = null
+          try { parsed = JSON.parse(raw) } catch (je) { parsed = null }
+          if (parsed && parsed.format === 'ser' && parsed.state) {
+            if (Blockly.serialization && Blockly.serialization.workspaces && Blockly.serialization.workspaces.load) {
+              Blockly.serialization.workspaces.load(parsed.state, this.workspace)
+            } else {
+              throw new Error('Blockly.serialization not available to load serialized workspace')
+            }
+          } else if (parsed) {
+            // assume parsed is a direct state object
+            if (Blockly.serialization && Blockly.serialization.workspaces && Blockly.serialization.workspaces.load) {
+              Blockly.serialization.workspaces.load(parsed, this.workspace)
+            } else {
+              throw new Error('Blockly.serialization not available to load serialized workspace')
+            }
+          } else {
+            throw new Error('Unrecognized import format')
+          }
         }
-        Blockly.Xml.clearWorkspaceAndLoadFromXml(xml, this.workspace)
         this._rebuildGraphFromBlocks()
         this._shiftTopBlocksIfUnderToolbox()
-          this.showStatus('Workspace imported')
+        this.showStatus('Workspace imported')
       } catch (e) { console.error('Import failed', e); this.showStatus('Import failed: ' + (e && e.message ? e.message : e)) }
     }
     r.readAsText(file)
@@ -416,6 +478,8 @@ class FsmPlayground extends LitElement {
           <button @click=${() => this.saveToLocal()}>Save</button>
           <button @click=${() => this.loadFromLocal()}>Load</button>
           <button @click=${() => this.exportWorkspace()}>Export</button>
+          <button @click=${() => this.inspectSaved()}>Inspect</button>
+          <button @click=${() => this.clearSaved()}>Clear Saved</button>
           <input id="wsImport" type="file" accept="text/xml" style="display:none" @change=${(e) => this.importWorkspace(e.target.files[0])} />
           <button @click=${() => this.shadowRoot ? this.shadowRoot.getElementById('wsImport').click() : document.getElementById('wsImport').click()}>Import</button>
         </div>
