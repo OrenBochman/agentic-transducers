@@ -1,0 +1,129 @@
+{
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "```{bash}\n",
+        "!uv pip install panini graphviz\n",
+        "```\n",
+        "\n",
+        "Define the FST\n",
+        "\n",
+        "We’ll create an FST that analyzes the word “running” into its root and suffix: “run+ing”."
+      ],
+      "id": "6299ed17"
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "import pynini\n",
+        "\n",
+        "o_to_a = pynini.cross(\"o\", \"a\")\n",
+        "one_or_more_o_to_a = o_to_a + pynini.closure(o_to_a)\n",
+        "\n",
+        "rule = pynini.cross(\"m\", \"b\") + one_or_more_o_to_a + pynini.cross(\"?\", \"!\")\n",
+        "\n",
+        "for s in [\"mo?\", \"moo?\", \"mooo?\"]:\n",
+        "    print(s, \"->\", pynini.shortestpath(s @ rule).string())"
+      ],
+      "id": "52bea4b2",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "metadata": {},
+      "source": [
+        "#| label: fig-fst-morphology\n",
+        "#| fig-cap: Toy morphology FST\n",
+        "#| echo: true\n",
+        "\n",
+        "#| label: fst-morphology\n",
+        "#| echo: true\n",
+        "\n",
+        "import subprocess\n",
+        "from pathlib import Path\n",
+        "\n",
+        "import pynini\n",
+        "\n",
+        "\n",
+        "def x(inp: str, out: str):\n",
+        "    \"\"\"Small alias for a one-symbol transducer.\"\"\"\n",
+        "    return pynini.cross(inp, out)\n",
+        "\n",
+        "\n",
+        "# This matches/transduces:\n",
+        "# r (u|n)* i (n|g)*\n",
+        "fst = (\n",
+        "    x(\"r\", \"r\")\n",
+        "    + pynini.closure(x(\"u\", \"u\") | x(\"n\", \"n\"))\n",
+        "    + x(\"i\", \"i\")\n",
+        "    + pynini.closure(x(\"n\", \"n\") | x(\"g\", \"g\"))\n",
+        ")\n",
+        "\n",
+        "# Keep graph readable.\n",
+        "fst = fst.optimize()\n",
+        "\n",
+        "dot_path = Path(\"fst_morphology.dot\")\n",
+        "png_path = Path(\"fst_morphology.png\")\n",
+        "\n",
+        "# Pynini/OpenFst writes DOT; Graphviz turns DOT into PNG.\n",
+        "fst.draw(str(dot_path), portrait=True)\n",
+        "\n",
+        "subprocess.run(\n",
+        "    [\"dot\", \"-Tpng\", str(dot_path), \"-o\", str(png_path)],\n",
+        "    check=True,\n",
+        ")\n",
+        "\n",
+        "png_path"
+      ],
+      "id": "fig-fst-morphology",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "markdown",
+      "metadata": {},
+      "source": [
+        "![](fst_morphology.png)\n",
+        "\n",
+        "\n",
+        "```python\n",
+        "input_sequence = list(\"running\")\n",
+        "\n",
+        "# Initialize the FST\n",
+        "current_state = fst.start\n",
+        "output_sequence = []\n",
+        "\n",
+        "# Process the input\n",
+        "for symbol in input_sequence:\n",
+        "    for arc in fst[current_state].arcs:\n",
+        "        if arc.ilabel == symbol:\n",
+        "            output_sequence.append(arc.olabel)\n",
+        "            current_state = arc.nextstate\n",
+        "            break\n",
+        "\n",
+        "# Check if the final state is reached\n",
+        "if fst[current_state].final:\n",
+        "    print(\"Input:\", \"\".join(input_sequence))\n",
+        "    print(\"Output:\", \"\".join(output_sequence))\n",
+        "else:\n",
+        "    print(\"Input not accepted by the FST.\")\n",
+        "```"
+      ],
+      "id": "4441e25d"
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "name": "python3",
+      "language": "python",
+      "display_name": "Python 3 (ipykernel)",
+      "path": "/home/oren/.local/share/jupyter/kernels/python3"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 5
+}
